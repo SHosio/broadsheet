@@ -3,7 +3,7 @@ require __DIR__ . '/config.php';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 define('CACHE_DIR', __DIR__ . '/cache');
-define('CACHE_TTL', 1800);
+define('CACHE_TTL', 21600); // 6 hours — top/week content changes slowly
 
 set_time_limit(120);
 if (!is_dir(CACHE_DIR)) mkdir(CACHE_DIR, 0755, true);
@@ -66,7 +66,12 @@ if (isset($_GET['proxy'])) {
 $rendered = [];
 foreach ($feeds as $fd) {
     $items = parseFeed(fetchFeed($fd['url']), $fd['limit']);
-    $rendered[$fd['id']] = ['id' => $fd['id'], 'col' => $fd['col'], 'title' => $fd['title'], 'items' => $items];
+    // Derive subreddit name for Reddit feeds
+    $sub = '';
+    if (preg_match('#^https://www\.reddit\.com/r/([^/]+)/#', $fd['url'], $m)) {
+        $sub = $m[1];
+    }
+    $rendered[$fd['id']] = ['id' => $fd['id'], 'col' => $fd['col'], 'title' => $fd['title'], 'items' => $items, 'sub' => $sub];
 }
 
 // Master list for JS (metadata only, no items)
@@ -266,7 +271,12 @@ header #settings-btn { color: #e0e0e0; border-color: #555; }
     user-select: none;
 }
 .feed-title:active { cursor: grabbing; }
+.feed-title a { color: #e0e0e0; text-decoration: none; }
+.feed-title a:hover { text-decoration: underline; color: #fff; }
 .feed-title .handle { color: #666; font-size: 13px; flex-shrink: 0; }
+.feed-top-links { margin-left: auto; display: flex; gap: 2px; flex-shrink: 0; }
+.feed-top-links a { font-size: 12px; text-decoration: none !important; opacity: .6; }
+.feed-top-links a:hover { opacity: 1; }
 
 /* ── Post rows ── */
 .feed ul { list-style: none; }
@@ -332,7 +342,17 @@ foreach ($byCol as $col => $colFeeds): ?>
     <div class="feed" data-id="<?= $fd['id'] ?>">
         <div class="feed-title">
             <span class="handle">&#x2807;</span>
-            <?= htmlspecialchars($fd['title']) ?>
+            <?php if ($fd['sub']): $base = 'https://www.reddit.com/r/' . htmlspecialchars($fd['sub']); ?>
+                <a href="<?= $base ?>/" target="_blank" rel="noopener noreferrer"><?= htmlspecialchars($fd['title']) ?></a>
+                <span class="feed-top-links">
+                    <a href="<?= $base ?>/top/?t=week" target="_blank" rel="noopener noreferrer" title="Top this week">📅</a>
+                    <a href="<?= $base ?>/top/?t=month" target="_blank" rel="noopener noreferrer" title="Top this month">📆</a>
+                    <a href="<?= $base ?>/top/?t=year" target="_blank" rel="noopener noreferrer" title="Top this year">🗓️</a>
+                    <a href="<?= $base ?>/top/?t=all" target="_blank" rel="noopener noreferrer" title="Top all time">🏆</a>
+                </span>
+            <?php else: ?>
+                <?= htmlspecialchars($fd['title']) ?>
+            <?php endif; ?>
         </div>
         <?php if ($fd['items']): ?>
         <ul>
